@@ -1,14 +1,45 @@
 package br.com.egus.api.dto;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+
 public class FuncionarioRequest {
+    
+    @NotBlank(message = "O nome é obrigatório")
     private String nome;
+    
+    @NotBlank(message = "O email é obrigatório")
+    @Email(message = "O formato do email é inválido")
     private String email;
-    private String senha;
+    
+    private String senha; 
+    
+    @NotNull(message = "O status 'ativo' é obrigatório")
     private Boolean ativo;
-    private String cargo; // string do enum
+    
+    @NotBlank(message = "O cargo é obrigatório")
+    @Pattern(regexp = "Administrador|Estoquista", 
+             message = "O cargo é inválido. Valores permitidos: Administrador, Estoquista")
+    private String cargo; 
+    
+    @NotNull(message = "O ID do mercado é obrigatório")
     private Integer idMercado;
 
-    // Getters e setters
+    public FuncionarioRequest() {
+    }
+    
+    public FuncionarioRequest(String nome, String email, String senha, Boolean ativo, String cargo, Integer idMercado) {
+        this.nome = nome;
+        this.email = email;
+        this.senha = senha;
+        this.ativo = ativo;
+        this.cargo = cargo;
+        this.idMercado = idMercado;
+    }
+
+
     public Boolean getAtivo() { return ativo; }
     public void setAtivo(Boolean ativo) { this.ativo = ativo; }
 
