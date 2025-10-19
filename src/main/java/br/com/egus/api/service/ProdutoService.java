@@ -1,12 +1,14 @@
 package br.com.egus.api.service;
 
 import br.com.egus.api.dto.ProdutoResponse;
+import br.com.egus.api.events.PrecoAlteradoEvent;
 import br.com.egus.api.model.produto.Promocao;
 import br.com.egus.api.model.produto.ProdutoMercado;
 import br.com.egus.api.repository.PromocaoRepository;
 import br.com.egus.api.repository.ProdutoMercadoRepository;
 import br.com.egus.api.service.MercadoLookupService;
 import br.com.egus.api.service.price.PriceStrategy;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,15 +24,18 @@ public class ProdutoService {
     private final PromocaoRepository promocaoRepository;
     private final List<PriceStrategy> priceStrategies;
     private final MercadoLookupService mercadoLookupService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ProdutoService(ProdutoMercadoRepository produtoMercadoRepository,
                           PromocaoRepository promocaoRepository,
                           List<PriceStrategy> priceStrategies,
-                          MercadoLookupService mercadoLookupService) {
+                          MercadoLookupService mercadoLookupService,
+                          ApplicationEventPublisher eventPublisher) {
         this.produtoMercadoRepository = produtoMercadoRepository;
         this.promocaoRepository = promocaoRepository;
         this.priceStrategies = priceStrategies;
         this.mercadoLookupService = mercadoLookupService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -57,7 +62,7 @@ public class ProdutoService {
                     precoFinal,
                     pm.getPreco(),
                     promo != null ? promo.getPrecoPromocional() : null,
-pm.getEstoque(),
+                    pm.getEstoque(),
                     mercadoLookupService.obterNome(pm.getIdMercado()),
                     pm.getId()
             );
@@ -93,5 +98,18 @@ pm.getEstoque(),
                     pm.getId()
             );
         }).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void alterarPreco(Integer produtoMercadoId, Double novoPreco, Integer idFuncionario) {
+        ProdutoMercado pm = produtoMercadoRepository.findById(produtoMercadoId)
+                .orElseThrow(() -> new IllegalArgumentException("ProdutoMercado não encontrado: " + produtoMercadoId));
+        Double precoAntigo = pm.getPreco();
+        if (novoPreco != null && !novoPreco.equals(precoAntigo)) {
+            pm.setPreco(novoPreco);
+            pm.setDataAtualizacao(LocalDateTime.now());
+            produtoMercadoRepository.save(pm);
+            eventPublisher.publishEvent(new PrecoAlteradoEvent(pm.getId(), precoAntigo, novoPreco, idFuncionario));
+        }
     }
 }

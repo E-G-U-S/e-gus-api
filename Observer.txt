@@ -1,0 +1,72 @@
+Observer (Eventos de Domínio) — Histórico de Preço e Promoção
+
+Visão Geral
+- Implementa eventos de domínio para registrar histórico de preço e reagir à criação de promoção.
+- Desacoplado do fluxo de serviços, garantindo registro somente após transações confirmadas (AFTER_COMMIT).
+- Extensível: novos listeners podem ser adicionados sem alterar serviços existentes.
+
+Por que
+- Desacoplamento: serviços focam em atualizar/preparar dados; listeners cuidam de efeitos colaterais (auditoria, integrações).
+- Confiabilidade transacional: @TransactionalEventListener(AFTER_COMMIT) só dispara após commit.
+- Evolução segura: adicionar/remover regras sem tocar em ProdutoService/PromocaoService.
+
+Arquitetura e Fluxo
+1) Alteração de preço base
+   - ProdutoService.alterarPreco(produtoMercadoId, novoPreco, idFuncionario)
+     • Atualiza ProdutoMercado.preco e data_atualizacao
+     • Publica PrecoAlteradoEvent(produtoMercadoId, precoAntigo, precoNovo, idFuncionario)
+   - HistoricoPrecoListener (AFTER_COMMIT)
+     • Recebe PrecoAlteradoEvent
+     • Persiste mkt_auto.historico_preco com preco_antigo, preco_novo, data_alteracao, id_funcionario
+
+2) Criação de promoção
+   - PromocaoService.criarPromocao(produtoMercadoId, idFuncionario, precoPromocional, dataValidade, descricao)
+     • Persiste mkt_auto.promocao
+     • Publica PromocaoCriadaEvent(promocao)
+   - PromocaoEventListener (AFTER_COMMIT)
+     • Ponto de extensão para cache/notificação/integradores (placeholder)
+
+Arquivos e Pontos-Chave
+- br.com.egus.api.events.PrecoAlteradoEvent
+  • produtoMercadoId, precoAntigo, precoNovo, idFuncionario
+- br.com.egus.api.events.PromocaoCriadaEvent
+  • promocao
+- br.com.egus.api.listener.HistoricoPrecoListener
+  • @TransactionalEventListener(AFTER_COMMIT) grava histórico
+- br.com.egus.api.listener.PromocaoEventListener
+  • @TransactionalEventListener(AFTER_COMMIT) para reações futuras
+- br.com.egus.api.model.produto.HistoricoPreco
+  • id, produtoMercado(@ManyToOne), precoAntigo, precoNovo, dataAlteracao, idFuncionario
+- br.com.egus.api.repository.HistoricoPrecoRepository
+  • JpaRepository<HistoricoPreco, Integer>
+- br.com.egus.api.service.ProdutoService
+  • alterarPreco(...) atualiza preço e publica PrecoAlteradoEvent
+- br.com.egus.api.service.PromocaoService
+  • criarPromocao(...) persiste promoção e publica PromocaoCriadaEvent
+
+Integração com Preço Final (Strategy)
+- O cálculo de preço exibido (final/base/promocional) continua via PriceStrategy.
+- Observer não altera o preço calculado; ele registra/reações paralelas.
+
+Sugestão de Endpoints (não implementados)
+- PATCH /produto-mercado/{id}/preco
+  • Body: { "novoPreco": number, "idFuncionario": number }
+  • Ação: ProdutoService.alterarPreco(...)
+- POST /promocoes
+  • Body: { "produtoMercadoId": number, "idFuncionario": number, "precoPromocional": number, "dataValidade": ISO, "descricao": string }
+  • Ação: PromocaoService.criarPromocao(...)
+
+Rodando e Validando
+- Construir: .\mvnw.cmd clean package -DskipTests
+- Rodar: .\mvnw.cmd spring-boot:run
+- Validação (manual):
+  • Chamar ProdutoService.alterarPreco(...) e verificar INSERT em mkt_auto.historico_preco
+  • Chamar PromocaoService.criarPromocao(...) e verificar INSERT em mkt_auto.promocao
+  • Consultar listagens já existentes:
+    - GET /mercados/{mercadoId}/produtos
+    - GET /produtos/{id}/mercados
+
+Notas
+- MercadoLookupService permanece inalterado; usado apenas para nomes.
+- HistoricoPrecoListener define dataAlteracao no momento do evento.
+- Possível evoluir com notificações, cache e integrações de terceiros via PromocaoEventListener.

@@ -1,0 +1,41 @@
+Opções Recomendadas
+
+- Chain of Responsibility
+  - Por quê: organiza múltiplas regras sequenciais (promoção, cupom, preço padrão) sem acoplamento; facilita adicionar/remover passos.
+  - Onde: PriceStrategy já está quase nisso (lista ordenada por @Order ). Podemos formalizar a cadeia, incluindo cupons e regras por mercado.
+
+- Decorator
+  - Por quê: permite somar/descontar comportamentos no cálculo de preço (ex.: desconto de cupom, taxa de mercado, fidelidade) sem alterar o core.
+  - Onde: um PriceCalculator base decorado por CouponDiscount , MarketFee , MemberDiscount , compondo dinamicamente.
+
+- Template Method 
+  - Por quê: extrai o fluxo comum e deixa “ganchos” para especializações; reduz duplicação entre estratégias.
+  - Onde: AuthenticationStrategy com um abstrato que define “parse → buscar usuário → validar senha → montar resposta”, e subclasses só implementam “buscar usuário” (email/CPF).
+
+- Specification (Spring Data Specification)
+  - Por quê: constrói filtros dinâmicos e reutilizáveis; evita queries ad-hoc e if-else em serviços.
+  - Onde: consultas de Produto / ProdutoMercado por categoria, preço, estoque, mercado, promoção ativa, etc.
+
+- Factory/Registry
+  - Por quê: lookup explícito e O(1) para selecionar estratégia por “tipo” (e.g., loginType=email|cpf ), em vez de iterar lista; melhora clareza e performance.
+  - Onde: AuthenticationStrategy e PriceStrategy com um StrategyRegistry mapeando chave → bean.
+
+- Observer (Domain Events)
+  - Por quê: desacopla reações a eventos de negócio (ex.: alteração de preço, baixa de estoque, criação de pedido) e grava historico_preco automaticamente.
+  - Onde: publicar eventos no ProdutoService e ouvir com @TransactionalEventListener para logging/integrações.
+
+- State
+  - Por quê: modela mudanças de estado com regras claras (ex.: pedido “CRIADO → PAGO → ENVIADO → CANCELADO”); evita switch-case espalhado.
+  - Onde: Pedido e talvez Promocao (ativa/inativa/expirada), controlando transições válidas.
+
+- Adapter
+  - Por quê: normaliza integrações externas (APIs/DBs de mercados diferentes) para uma interface interna única.
+  - Onde: MercadoLookupService e futuras integrações de marketplaces.
+
+- Facade
+  - Por quê: expõe uma API de serviço única e mais simples aos controllers, orquestrando repositórios/estratégias por trás.
+  - Onde: ProdutoFacade para operações compostas (listar com preços, aplicar promoção, reservar estoque).
+
+- Builder (Lombok @Builder )
+  - Por quê: facilita montar DTOs complexos sem construtores inchados; melhora legibilidade.
+  - Onde: ProdutoResponse , ProdutoBaseResponse e respostas agregadas com preço/mercado/promo.
