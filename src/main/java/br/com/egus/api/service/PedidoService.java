@@ -27,14 +27,17 @@ public class PedidoService {
     private final PedidoRepository pedidoRepository;
     private final UsuarioRepository usuarioRepository;
     private final br.com.egus.api.repository.ProdutoMercadoRepository produtoMercadoRepository;
+    private final br.com.egus.api.repository.ProdutoRepository produtoRepository;
 
     public PedidoService(PedidoRepository pedidoRepository,
                          UsuarioRepository usuarioRepository,
-                         br.com.egus.api.repository.ProdutoMercadoRepository produtoMercadoRepository) {
+                         br.com.egus.api.repository.ProdutoMercadoRepository produtoMercadoRepository,
+                         br.com.egus.api.repository.ProdutoRepository produtoRepository) {
 
         this.pedidoRepository = pedidoRepository;
         this.usuarioRepository = usuarioRepository;
         this.produtoMercadoRepository = produtoMercadoRepository;
+        this.produtoRepository = produtoRepository;
     }
 
     @Transactional
@@ -56,10 +59,15 @@ public class PedidoService {
             }
         }
 
-        // após tentativas, se ainda não temos idUsuario, retorna erro
-       // if (dto.getIdUsuario() == null) {
-        //    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "idUsuario é obrigatório");
-      //  }
+        // valida obrigatoriedade de idUsuario
+        if (dto.getIdUsuario() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "idUsuario é obrigatório");
+        }
+
+        Integer resolvedMercadoId = resolveIdMercado(dto);
+        if (resolvedMercadoId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "idMercado é obrigatório");
+        }
 
         // Verifica se usuário existe (busca por id)
         usuarioRepository.findById(dto.getIdUsuario())
@@ -70,30 +78,60 @@ public class PedidoService {
         // armazenamos o id do usuário em idUsuario (coluna id_usuario)
         pedido.setIdUsuario(dto.getIdUsuario());
         pedido.setIdCupom(dto.getIdCupom());
-        pedido.setIdMercado(dto.getIdMercado());
+        pedido.setIdMercado(resolvedMercadoId);
         pedido.setDataHora(dto.getDataHora() == null ? LocalDateTime.now() : dto.getDataHora());
 
         // map items to entities and attach before saving so cascade persists items
         if (dto.getItens() != null) {
             for (PedidoItemDto itemDto : dto.getItens()) {
-                // now frontend sends produto_mercado id; fetch ProdutoMercado
-                ProdutoMercado pm = produtoMercadoRepository.findById(itemDto.getProdutoMercadoId())
-                    .orElseThrow(() -> new IllegalArgumentException("ProdutoMercado não encontrado: " + itemDto.getProdutoMercadoId()));
-
                 PedidoItemModel item = new PedidoItemModel();
-                // store reference to product (itempedido.id_produto references produto.id)
-                item.setProduto(pm.getProduto());
-                item.setQuantidade(itemDto.getQuantidade());
-                // prefer provided unit price; otherwise use the product-market price
-                item.setPrecoUnitario(itemDto.getPrecoUnitario() == null ? pm.getPreco() : itemDto.getPrecoUnitario());
-                // ensure pedido's mercado matches the produto_mercado mercado (optional validation)
-                if (pedido.getIdMercado() != null && !pedido.getIdMercado().equals(pm.getIdMercado())) {
-                    throw new IllegalArgumentException("ProdutoMercado não pertence ao mercado do pedido: " + pm.getId());
+
+                ProdutoMercado pm = null;
+
+                if (itemDto.getProdutoMercadoId() != null) {
+                    pm = produtoMercadoRepository.findById(itemDto.getProdutoMercadoId())
+                            .orElseThrow(() -> new IllegalArgumentException("ProdutoMercado não encontrado: " + itemDto.getProdutoMercadoId()));
+                    item.setProduto(pm.getProduto());
+                    if (pedido.getIdMercado() != null && !pedido.getIdMercado().equals(pm.getIdMercado())) {
+                        throw new IllegalArgumentException("ProdutoMercado não pertence ao mercado do pedido: " + pm.getId());
+                    }
+                } else if (itemDto.getProdutoId() != null) {
+                    var produto = produtoRepository.findById(itemDto.getProdutoId())
+                            .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + itemDto.getProdutoId()));
+                    item.setProduto(produto);
+                    var listaPm = produtoMercadoRepository.findAllByProdutoIdFetch(produto.getId());
+                    pm = listaPm.stream().filter(x -> pedido.getIdMercado().equals(x.getIdMercado())).findFirst()
+                            .orElse(null);
+                    if (pm == null) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Produto não disponível no mercado informado");
+                    }
+                } else {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe produtoMercadoId ou produtoId em cada item");
                 }
-                // compute and set valor_item_total to match DB NOT NULL constraint
+
+                item.setQuantidade(itemDto.getQuantidade());
+                Double precoUnit = itemDto.getPrecoUnitario();
+                if (precoUnit == null) {
+                    precoUnit = pm != null ? pm.getPreco() : null;
+                }
+                if (precoUnit == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Preço do item não informado e não encontrado para o mercado");
+                }
+                item.setPrecoUnitario(precoUnit);
+
                 Double valorItem = (item.getPrecoUnitario() == null || item.getQuantidade() == null) ? 0.0
-                    : item.getPrecoUnitario() * item.getQuantidade();
+                        : item.getPrecoUnitario() * item.getQuantidade();
                 item.setValorItemTotal(valorItem);
+
+                if (pm != null) {
+                    int estoqueAtual = pm.getEstoque() == null ? 0 : pm.getEstoque();
+                    int quantidade = item.getQuantidade() == null ? 0 : item.getQuantidade();
+                    if (quantidade > estoqueAtual) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estoque insuficiente para produtoMercado: " + pm.getId());
+                    }
+                    pm.setEstoque(estoqueAtual - quantidade);
+                    pm.setDataAtualizacao(LocalDateTime.now());
+                }
                 pedido.addItem(item);
             }
         }
@@ -138,6 +176,26 @@ public class PedidoService {
         if (produtoId == null || mercadoId == null) return null;
         var list = produtoMercadoRepository.findAllByProdutoIdFetch(produtoId);
         return list.stream().filter(pm -> mercadoId.equals(pm.getIdMercado())).findFirst().map(ProdutoMercado::getId).orElse(null);
+    }
+
+    private Integer resolveIdMercado(PedidoDto dto) {
+        Integer id = dto.getIdMercado();
+        if (id != null) {
+            var pmOpt = produtoMercadoRepository.findById(id);
+            if (pmOpt.isPresent()) {
+                return pmOpt.get().getIdMercado();
+            }
+            return id;
+        }
+        if (dto.getItens() != null) {
+            for (PedidoItemDto i : dto.getItens()) {
+                if (i.getProdutoMercadoId() != null) {
+                    var pm = produtoMercadoRepository.findById(i.getProdutoMercadoId()).orElse(null);
+                    if (pm != null) return pm.getIdMercado();
+                }
+            }
+        }
+        return null;
     }
 }
 

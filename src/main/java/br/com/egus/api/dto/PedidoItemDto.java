@@ -2,6 +2,7 @@ package br.com.egus.api.dto;
 
 public class PedidoItemDto {
 
+    private Long produtoId;
     private Integer produtoMercadoId;
     private Integer quantidade;
     private Double precoUnitario;
@@ -14,6 +15,9 @@ public class PedidoItemDto {
         this.quantidade = quantidade;
         this.precoUnitario = precoUnitario;
     }
+
+    public Long getProdutoId() { return produtoId; }
+    public void setProdutoId(Long produtoId) { this.produtoId = produtoId; }
 
     public Integer getProdutoMercadoId() { return produtoMercadoId; }
     public void setProdutoMercadoId(Integer produtoMercadoId) { this.produtoMercadoId = produtoMercadoId; }
