@@ -1,6 +1,5 @@
 package br.com.egus.api.model.produto;
 
-import br.com.egus.api.model.pessoa.Funcionario;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 

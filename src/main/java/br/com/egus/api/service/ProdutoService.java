@@ -5,7 +5,7 @@ import br.com.egus.api.model.produto.Promocao;
 import br.com.egus.api.model.produto.ProdutoMercado;
 import br.com.egus.api.repository.PromocaoRepository;
 import br.com.egus.api.repository.ProdutoMercadoRepository;
-import br.com.egus.api.service.MercadoLookupService;
+
 import br.com.egus.api.service.price.PriceStrategy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
