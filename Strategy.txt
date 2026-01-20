@@ -1,0 +1,82 @@
+Como Funciona
+
+- AuthenticationStrategy define o contrato: supports(LoginRequest) e authenticate(LoginRequest) .
+- EmailAuthenticationStrategy
+  - Suporta quando request.getEmail() != null .
+  - Autentica primeiro como Funcionario (verifica ativo e senha); se não existir, autentica como Usuario .
+  - Mantém as mesmas mensagens e o mesmo LoginResponse do código original.
+- CpfAuthenticationStrategy
+  - Suporta quando request.getCpf() != null .
+  - Autentica Usuario por CPF e senha, com as mesmas mensagens do código original.
+- AutenticaService
+  - Recebe List<AuthenticationStrategy> (injeção do Spring).
+  - Escolhe a primeira estratégia que “supports” o LoginRequest e delega a autenticação.
+  - Quando nenhum suporte, lança BAD_REQUEST com “É necessário informar email ou CPF”.
+Por Que Strategy Combina Com o Projeto
+
+- Separa claramente os “modos de autenticação” (email/CPF), removendo condicionais extensas no serviço.
+- Facilita extensão futura sem tocar no serviço principal (Open/Closed):
+  - Ex.: adicionar TelefoneAuthenticationStrategy , OAuthAuthenticationStrategy , etc., só criando novas classes.
+- Melhora testabilidade e coesão (Single Responsibility):
+  - Cada estratégia tem suas regras e exceções, testáveis isoladamente.
+- Mantém contratos e comportamento:
+  - POST /login continua igual; respostas e mensagens de erro foram preservadas.
+Arquivos e Pontos-Chave
+
+- br.com.egus.api.service.auth.AuthenticationStrategy :
+  - boolean supports(LoginRequest request);
+  - LoginResponse authenticate(LoginRequest request);
+- AutenticaService :
+  - return strategies.stream().filter(s -> s.supports(request)).findFirst()... .authenticate(request);
+Rodando e Validando
+
+- Construir: .\mvnw.cmd clean package -DskipTests
+- Rodar: .\mvnw.cmd spring-boot:run
+- Se o servidor já estiver rodando, reinicie para carregar a refatoração.
+- Certifique-se das variáveis:
+  - setx DB_USER "postgres.mgjzcnaijbeyrkojudlz"
+  - setx DB_PASSWORD "Charmande3642"
+  - Ou passe via argumentos: -Dspring-boot.run.arguments="--spring.datasource.username=...,--spring.datasource.password=..."
+
+
+
+
+trategy de Preço (Produtos)
+
+Como Funciona
+
+- PriceStrategy define o contrato: supports(ProdutoMercado, Promocao) e calcular(ProdutoMercado, Promocao).
+- PromotionalPriceStrategy
+  - Suporta quando existe promoção ativa para o ProdutoMercado.
+  - Retorna o preço promocional.
+- DefaultPriceStrategy
+  - Fallback quando não há promoção ativa.
+  - Retorna o preço base do ProdutoMercado.
+- ProdutoService
+  - Injeta List<PriceStrategy> e escolhe a primeira que “supports” o contexto (produto no mercado + promoção ativa), calculando o preço final.
+  - Monta o DTO ProdutoResponse com nome, categoria, imagem, estoque, preço base, preço promocional (se houver) e preço final.
+
+Por Que Usar Strategy Aqui
+
+- Isola regras de precificação e evita if-else espalhados pelo serviço.
+- Extensível (Open/Closed): novos tipos de preço (ex.: preço por horário, preço VIP, preço por quantidade) entram como novas estratégias sem alterar o serviço.
+- Testável: cada estratégia é pequena e pode ser validada isoladamente.
+
+Arquivos e Pontos-Chave
+
+- br.com.egus.api.service.price.PriceStrategy
+  - boolean supports(ProdutoMercado pm, Promocao promo)
+  - double calcular(ProdutoMercado pm, Promocao promo)
+- br.com.egus.api.service.price.PromotionalPriceStrategy (@Order(1))
+- br.com.egus.api.service.price.DefaultPriceStrategy (@Order(2))
+- br.com.egus.api.service.ProdutoService
+  - Aplica a estratégia de preço e retorna List<ProdutoResponse>.
+- Endpoint
+  - GET /mercados/{mercadoId}/produtos
+  - Retorna lista para o front consumir diretamente (com preço final).
+
+Rodando e Validando
+
+- Construir: .\mvnw.cmd clean package -DskipTests
+- Rodar: .\mvnw.cmd spring-boot:run
+- Teste no navegador/cliente: GET http://localhost:8080/mercados/1/produtos
