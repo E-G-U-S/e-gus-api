@@ -50,7 +50,7 @@ class ProdutoBaseControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(2, response.getBody().size());
-        assertEquals("Coca-Cola", response.getBody().get(0).getNome());
+        assertEquals("Coca-Cola", response.getBody().getFirst().getNome());
 
         verify(produtoBaseService, times(1)).listarTodos();
     }

@@ -51,7 +51,7 @@ class ProdutoPrecoControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals(2, response.getBody().size());
-        assertEquals("Coca-Cola", response.getBody().get(0).getNome());
+        assertEquals("Coca-Cola", response.getBody().getFirst().getNome());
 
         verify(produtoService, times(1)).listarPorProduto(1L);
     }

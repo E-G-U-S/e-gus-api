@@ -48,7 +48,7 @@ class ProdutoControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals(2, response.getBody().size());
-        assertEquals("Arroz", response.getBody().get(0).getNome());
+        assertEquals("Arroz", response.getBody().getFirst().getNome());
         assertEquals("Feijão", response.getBody().get(1).getNome());
 
         verify(produtoService).listarPorMercado(mercadoId);
