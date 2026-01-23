@@ -57,7 +57,7 @@ class ProdutoBaseServiceTest {
         List<ProdutoBaseResponse> result = produtoBaseService.listarTodos();
 
         assertEquals(1, result.size());
-        ProdutoBaseResponse dto = result.get(0);
+        ProdutoBaseResponse dto = result.getFirst();
 
         assertEquals(1L, dto.getId());
         assertEquals("Cerveja", dto.getNome());

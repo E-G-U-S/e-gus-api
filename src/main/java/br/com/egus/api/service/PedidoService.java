@@ -49,10 +49,10 @@ public class PedidoService {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null) {
                 Object principal = auth.getPrincipal();
-                if (principal instanceof br.com.egus.api.model.pessoa.Usuario) {
-                    dto.setIdUsuario(((br.com.egus.api.model.pessoa.Usuario) principal).getId());
-                } else if (principal instanceof UserDetails) {
-                    String username = ((UserDetails) principal).getUsername();
+                if (principal instanceof br.com.egus.api.model.pessoa.Usuario usuario) {
+                    dto.setIdUsuario(usuario.getId());
+                } else if (principal instanceof UserDetails details) {
+                    String username = details.getUsername();
                     // assume username is email
                     usuarioRepository.findByEmail(username).ifPresent(u -> dto.setIdUsuario(u.getId()));
                 }

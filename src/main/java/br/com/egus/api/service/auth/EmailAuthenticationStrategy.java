@@ -5,6 +5,7 @@ import br.com.egus.api.dto.LoginResponse;
 import br.com.egus.api.model.pessoa.Funcionario;
 import br.com.egus.api.repository.FuncionarioRepository;
 import br.com.egus.api.repository.UsuarioRepository;
+import br.com.egus.api.service.SupabaseAuthService;
 import br.com.egus.api.service.SenhaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,12 +18,15 @@ public class EmailAuthenticationStrategy implements AuthenticationStrategy {
     private final UsuarioRepository usuarioRepository;
     private final SenhaService senhaService;
 
+    private final SupabaseAuthService supabaseAuthService;
     public EmailAuthenticationStrategy(FuncionarioRepository funcionarioRepository,
                                        UsuarioRepository usuarioRepository,
-                                       SenhaService senhaService) {
+                                       SenhaService senhaService,
+                                       SupabaseAuthService supabaseAuthService) {
         this.funcionarioRepository = funcionarioRepository;
         this.usuarioRepository = usuarioRepository;
         this.senhaService = senhaService;
+        this.supabaseAuthService = supabaseAuthService;
     }
 
     @Override
@@ -57,13 +61,20 @@ public class EmailAuthenticationStrategy implements AuthenticationStrategy {
         var usuario = usuarioRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email ou senha inválidos"));
 
-        if (!senhaService.validarSenha(request.getSenha(), usuario.getSenha())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email ou senha inválidos");
+        // [MUDANÇA AQUI]: Para usuário, NÃO usamos senhaService (pois a senha no banco é NULL ou velha).
+        // Usamos o Supabase para validar.
+        String tokenSupabase = supabaseAuthService.loginNoSupabase(request.getEmail(), request.getSenha());
+        
+        if (tokenSupabase == null) {
+             // Se o Supabase recusou, a senha está errada.
+             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email ou senha inválidos");
         }
 
+        // Se passou, retornamos os dados do banco local
         return new LoginResponse(
                 usuario.getId(),
-                usuario.getNome(), "USUARIO",
+                usuario.getNome(), 
+                "USUARIO",
                 usuario.getCpf(),
                 usuario.getEmail(),
                 usuario.getPreferences()

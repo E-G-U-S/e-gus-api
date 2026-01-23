@@ -90,7 +90,7 @@ class ProdutoServiceTest {
         List<ProdutoResponse> result = produtoService.listarPorMercado(5);
 
         assertThat(result).hasSize(1);
-        ProdutoResponse r = result.get(0);
+        ProdutoResponse r = result.getFirst();
 
         assertThat(r.getPrecoFinal()).isEqualTo(10.0);
         assertThat(r.getPrecoBase()).isEqualTo(10.0);
@@ -120,7 +120,7 @@ class ProdutoServiceTest {
 
         List<ProdutoResponse> result = produtoService.listarPorMercado(5);
 
-        ProdutoResponse r = result.get(0);
+        ProdutoResponse r = result.getFirst();
 
         assertThat(r.getPrecoFinal()).isEqualTo(7.5);
         assertThat(r.getPrecoPromocional()).isEqualTo(7.5);
@@ -143,7 +143,7 @@ class ProdutoServiceTest {
 
         List<ProdutoResponse> result = produtoService.listarPorMercado(5);
 
-        ProdutoResponse r = result.get(0);
+        ProdutoResponse r = result.getFirst();
 
         assertThat(r.getPrecoFinal()).isEqualTo(pm.getPreco());
     }
@@ -166,7 +166,7 @@ class ProdutoServiceTest {
 
         List<ProdutoResponse> result = produtoService.listarPorProduto(1L);
 
-        ProdutoResponse r = result.get(0);
+        ProdutoResponse r = result.getFirst();
 
         assertThat(r.getMercadoNome()).isEqualTo("Mercado XP");
         assertThat(r.getPrecoFinal()).isEqualTo(10.0);
